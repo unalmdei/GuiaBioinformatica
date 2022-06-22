@@ -32,7 +32,7 @@ Descargar el conjunto de datos de [este link](https://github.com/unalmdei/GuiaBi
 ```{r}
 #Cargar el archivo "e100.RData"
 
-load("e100.RData")
+load("../data/e100.RData")
 e99 = e100[-which.max(e100)]
 barplot(table(e99), space = 0.8, col = "chartreuse4")
 ```
@@ -136,8 +136,9 @@ plot(thetas, loglikelihood(thetas), xlab = expression(theta),
 
 El conjunto de datos se encuentra en [este link](https://github.com/unalmdei/GuiaBioinformatica/blob/master/Datos/Cap2/staphsequence.ffn.txt)
 ```{r}
-library("Biostrings")
-staph = readDNAStringSet("staphsequence.ffn.txt", "fasta")
+p_load("Biostrings")
+staph = readDNAStringSet("https://raw.githubusercontent.com/unalmdei/GuiaBioinformatica/master/Datos/Cap2/staphsequence.ffn.txt", "fasta")
+staph
 
 ```
 
@@ -218,7 +219,7 @@ abline(a = 0, b = 1, col = "red")
 
 El conjunto de datos se encuentra en [este link](https://github.com/unalmdei/GuiaBioinformatica/blob/master/Datos/Cap2/ChargaffTable.RData)
 ```{r}
-load("ChargaffTable.RData")
+load("../data/ChargaffTable.RData")
 ChargaffTable
 ```
 ```{r}
@@ -263,7 +264,7 @@ El conjunto de datos se encuentra en [este link](https://github.com/unalmdei/Gui
 ```{r}
 #browseURL("https://github.com/unalmdei/GuiaBioinformatica/blob/master/Datos/Cap2/Deuteranopia.RData")
 
-load("Deuteranopia.RData")
+load("../data/Deuteranopia.RData")
 Deuteranopia
 
 ```
@@ -346,7 +347,7 @@ El conjunto de datos se encuentra en [este link](https://github.com/unalmdei/Gui
 
 ```{r}
 library("seqLogo")
-load("kozak.RData")
+load("../data/kozak.RData")
 kozak
 ```
 
@@ -380,7 +381,7 @@ plot.igraph(MCgraph, edge.label = edgelab,
 El conjunto de datos se encuentra en [este link](https://github.com/unalmdei/GuiaBioinformatica/blob/master/Datos/Cap2/haplotype6.txt)
 
 ```{r}
-haplo6=read.table("haplotype6.txt",header = TRUE)
+haplo6=read.table("https://raw.githubusercontent.com/unalmdei/GuiaBioinformatica/master/Datos/Cap2/haplotype6.txt",header = TRUE)
 haplo6
 ```
 ### 2.9.2 Estudio de simulación del paradigma bayesiano para el binomio
@@ -501,7 +502,7 @@ expplot(width(betweenmotifs), rate = 1/mean(width(betweenmotifs)),
 library("BSgenome.Hsapiens.UCSC.hg19")
 
 chr8  =  Hsapiens$chr8
-CpGtab = read.table("model-based-cpg-islands-hg19.txt",
+CpGtab = read.table("https://raw.githubusercontent.com/unalmdei/GuiaBioinformatica/master/Datos/Cap2/model-based-cpg-islands-hg19.txt",
                     header = TRUE)
 nrow(CpGtab)
 head(CpGtab)
@@ -633,7 +634,7 @@ La multiplicidad (el número de codones que codifican para el mismo aminoácido)
 El conjunto de datos se encuentra disponible en [este link](https://github.com/unalmdei/GuiaBioinformatica/blob/master/Datos/Cap2/staphsequence.ffn.txt)
 
 ```{r}
-mtb = read.table("M_tuberculosis.txt", header = TRUE)
+mtb = read.table("https://raw.githubusercontent.com/unalmdei/GuiaBioinformatica/master/Datos/Cap2/M_tuberculosis.txt", header = TRUE)
 head(mtb, n = 4)
 ```
 
@@ -655,7 +656,7 @@ Muestre el contenido de GC en una ventana en ejecución a lo largo de la secuenc
 El conjunto de datos se encuentra disponible en [este link](https://github.com/unalmdei/GuiaBioinformatica/blob/master/Datos/Cap2/staphsequence.ffn.txt)
 
 ```{r}
-staph = readDNAStringSet("staphsequence.ffn.txt", "fasta")
+staph = readDNAStringSet("https://raw.githubusercontent.com/unalmdei/GuiaBioinformatica/master/Datos/Cap2/staphsequence.ffn.txt", "fasta")
 ```
 
 

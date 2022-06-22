@@ -1,0 +1,590 @@
+---
+title: "Cap7 Análisis multivariado "
+date: '2022-06-18'
+output:
+  rmdformats::downcute:
+    lightbox: true
+    gallery: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 7.1 Objetivos de este capítulo 
+
+* Vea ejemplos de matrices que surgen en el estudio de datos biológicos.
+
+* Realice la reducción de dimensiones para comprender las correlaciones entre las variables.
+
+* Preprocesar, volver a escalar y centrar los datos antes de iniciar un análisis multivariable.
+
+* Construya nuevas variables, llamadas componentes principales (PC), que sean más útiles que las medidas originales.
+
+* Vea lo que está "bajo el capó" de PCA: la descomposición de valores singulares de una matriz.
+
+* Visualiza lo que logra esta descomposición y aprende a elegir el número de componentes principales.
+
+* Realice un análisis PCA completo de principio a fin.
+
+* El factor del proyecto covaria en el mapa PCA para permitir una interpretación más útil de los resultados.
+
+# 7.2 ¿Qué son los datos? Matrices y su motivación.
+
+Se tienen un conjunto de ejemplos de matrices utilizadas para representar tablas de medidas.
+
+```{r}
+#PAQUETES 
+library(pacman)
+p_load(ggplot2,dplyr)
+```
+
+```{r}
+turtles = read.table("../data/PaintedTurtles.txt", header = TRUE)
+turtles[1:4, ]
+```
+
+```{r, warning=FALSE, message=FALSE}
+p_load("ade4")
+data("olympic")
+athletes = data.frame(olympic$tab)
+names(athletes) = c("m100", "long", "weight", "highj", "m400", "m110",
+                    "disc", "pole", "javel", "m1500")
+save(athletes,file = "../data/athletes.RData")
+```
+
+Atletas: Esta matriz es un ejemplo interesante del mundo del deporte. Informa las actuaciones de 33 atletas en las diez disciplinas del decatlón.
+
+```{r}
+load("../data/athletes.RData")
+athletes[1:3, ]
+```
+
+**Tipos de células**: Holmes et al. ( 2005 ) estudiaron los perfiles de expresión génica de poblaciones de células T ordenadas de diferentes sujetos. Las columnas son un subconjunto de medidas de expresión génica, corresponden a 156 genes que muestran expresión diferencial entre tipos de células. 
+
+```{r}
+load("../data/Msig3transp.RData")
+round(Msig3transp,2)[1:5, 1:6]
+```
+
+Abundancia de especies bacterianas: las matrices de conteo se utilizan en estudios de ecología microbiana. Aquí las columnas representan diferentes especies (o unidades taxonómicas operativas, OTU) de bacterias, que se identifican mediante etiquetas numéricas. Las filas están etiquetadas de acuerdo con las muestras en las que se midieron, y los números (enteros) representan el número de veces que se observó cada una de las OTU en cada una de las muestras. 
+
+```{r, warning=FALSE,message=FALSE}
+p_load(phyloseq)
+data("GlobalPatterns", package = "phyloseq")
+GPOTUs = as.matrix(t(phyloseq::otu_table(GlobalPatterns)))
+GPOTUs[1:4, 6:13]
+```
+
+**ARNm**: los datos del transcriptoma de ARN-Seq informan el número de lecturas de secuencia que coinciden con cada gen 107 en cada una de varias muestras biológicas.
+
+```{r, message=FALSE,warning=FALSE}
+p_load("SummarizedExperiment")
+data("airway", package = "airway")
+assay(airway)[1:3, 1:4]
+```
+
+**Perfiles proteómicos**: Aquí, las columnas son de espectroscopia de masas o moléculas identificadas a través de su m / z -razones; las entradas en la matriz son las intensidades medidas.
+
+```{r}
+metab = t(as.matrix(read.csv("../data/metabolites.csv", row.names = 1)))
+metab[1:4, 1:4]
+```
+
+## 7.2.1 Resúmenes y preparación de datos de baja dimensión 
+
+```{r}
+cor(turtles[, -1])
+```
+
+```{r}
+library("ggplot2")
+library("dplyr")
+library("GGally")
+library(pacman)
+ggpairs(turtles[, -1], axisLabels = "none")
+```
+
+```{r}
+p_load("pheatmap")
+pheatmap(cor(athletes), cell.width = 10, cell.height = 10)
+```
+
+```{r}
+apply(turtles[,-1], 2, sd)
+apply(turtles[,-1], 2, mean)
+scaledTurtles = scale(turtles[, -1])
+apply(scaledTurtles, 2, mean)
+apply(scaledTurtles, 2, sd)
+data.frame(scaledTurtles, sex = turtles[, 1]) %>%
+  ggplot(aes(x = width, y = height, group = sex)) +
+    geom_point(aes(color = sex)) + coord_fixed()
+```
+
+# 7.3 Reducción de dimensiones 
+
+```{r}
+x1=1;x2=3;y1=1;y2=2;ax=2.5;ay=3;
+df=data.frame(x=c(x1,x2,ax),y=c(y1,y2,ay))
+ggplot(df,aes(x=x,y=y))+ geom_point(size=2) +
+       geom_abline(intercept=0.5,slope=0.5, color="red", size=1.3) + xlim(c(0,4)) + ylim(c(0,4))+
+       geom_segment(x=x1,y=y1,xend=x2-0.5,yend=y2-0.25,arrow=arrow(length = unit(0.3,"cm")),color="blue") +
+       geom_segment(x=ax,y=ay,xend=x2,yend=y2,arrow=arrow(length = unit(0.3,"cm")),color="orange",
+       linetype = 5, size = 1.2, alpha = 0.5) + annotate("text", x = ax+0.2, y = ay+0.15, label = "A", size=6) +
+       annotate("text", x = x2, y = y2-0.5, label = "proj_v(A)", size=6) +
+       annotate("text", x = x1+0.75, y = y1+0.24, label = "v", size=6, color="blue") +
+       annotate("text", x = x1-0.2, y = y1+ 0.2, label = "O", size=6) +
+       coord_fixed() +  theme_void() + geom_point(size=2)
+```
+
+## 7.3.1 Proyecciones de menor dimensión 
+
+```{r}
+athletes = data.frame(scale(athletes))
+ath_gg = ggplot(athletes, aes(x = weight, y = disc)) +
+  geom_point(size = 2, shape = 21)
+ath_gg + geom_point(aes(y = 0), colour = "red") +
+  geom_segment(aes(xend = weight, yend = 0), linetype = "dashed")
+```
+
+## 7.3.2 ¿Cómo resumimos los datos bidimensionales en una línea? 
+
+### Regresión de una variable sobre la otra
+
+Si ha visto regresión lineal, ya sabe cómo calcular líneas que resumen diagramas de dispersión; La regresión lineal es un supervisado que da preferencia minimizando la suma residual de cuadrados en una dirección: la de la variable respuesta. 
+
+**Regresión de la variable disco sobre el peso**
+
+```{r}
+reg1 = lm(disc ~ weight, data = athletes)
+a1 = reg1$coefficients[1] # intercept
+b1 = reg1$coefficients[2] # slope
+pline1 = ath_gg + geom_abline(intercept = a1, slope = b1,
+    col = "blue", lwd = 1.5)
+pline1 + geom_segment(aes(xend = weight, yend = reg1$fitted),
+    colour = "red", arrow = arrow(length = unit(0.15, "cm")))
+```
+
+**Regresión del peso sobre el disco**
+
+```{r}
+reg2 = lm(weight ~ disc, data = athletes)
+a2 = reg2$coefficients[1] # intercept
+b2 = reg2$coefficients[2] # slope
+pline2 = ath_gg + geom_abline(intercept = -a2/b2, slope = 1/b2,
+    col = "darkgreen", lwd = 1.5)
+pline2 + geom_segment(aes(xend=reg2$fitted, yend=disc),
+    colour = "orange", arrow = arrow(length = unit(0.15, "cm")))
+```
+```{r}
+var(athletes$weight) + var(reg1$fitted)
+```
+**Una línea que minimiza las distancias en ambas direcciones** 
+
+```{r}
+xy = cbind(athletes$disc, athletes$weight)
+svda = svd(xy)
+pc = xy %*% svda$v[, 1] %*% t(svda$v[, 1])
+bp = svda$v[2, 1] / svda$v[1, 1]
+ap = mean(pc[, 2]) - bp * mean(pc[, 1])
+ath_gg + geom_segment(xend = pc[, 1], yend = pc[, 2]) +
+  geom_abline(intercept = ap, slope = bp, col = "purple", lwd = 1.5)
+```
+
+```{r}
+pline1 + geom_segment(aes(xend = weight, yend = reg1$fitted), colour = "blue", alpha = 0.35) +
+  geom_abline(intercept = -a2/b2, slope = 1/b2, col = "darkgreen", lwd = 1.5, alpha = 0.8) +
+  geom_segment(aes(xend = reg2$fitted, yend = disc), colour = "orange", alpha = 0.35) +
+  geom_abline(intercept = ap, slope = bp, col = "purple", lwd = 1.5, alpha = 0.8) +
+  geom_segment(xend = pc[, 1], yend = pc[, 2], colour = "purple", alpha = 0.35) + coord_fixed()
+```
+```{r}
+apply(pc, 2, var)
+sum(apply(pc, 2, var))
+```
+# 7.4 Las nuevas combinaciones lineales 
+
+# 7.5 El flujo de trabajo de PCA
+
+# 7.6 El funcionamiento interno de PCA: reducción de rango 
+
+## 7.6.1 Matrices de rango uno 
+
+```{r}
+.savedopt = options(digits = 3)
+X = matrix(c(780,  75, 540,
+             936,  90, 648,
+            1300, 125, 900,
+             728,  70, 504), nrow = 3)
+u = c(0.8196, 0.0788, 0.5674)
+v = c(0.4053, 0.4863, 0.6754, 0.3782)
+s1 = 2348.2
+sum(u^2)
+sum(v^2)
+s1 * u %*% t(v)
+X - s1 * u %*% t(v)
+options(.savedopt)
+```
+
+
+```{r}
+svd(X)$u[, 1]
+svd(X)$v[, 1]
+sum(svd(X)$u[, 1]^2)
+sum(svd(X)$v[, 1]^2)
+svd(X)$d
+```
+
+## 7.6.2 ¿Cómo encontramos tal descomposición de una manera única? 
+
+```{r}
+Xtwo = matrix(c(12.5, 35.0, 25.0, 25, 9, 14, 26, 18, 16, 21, 49, 32,
+       18, 28, 52, 36, 18, 10.5, 64.5, 36), ncol = 4, byrow = TRUE)
+USV = svd(Xtwo)
+```
+
+```{r}
+names(USV)
+USV$d
+```
+
+```{r}
+Xtwo - USV$d[1] * USV$u[, 1] %*% t(USV$v[, 1])
+Xtwo - USV$d[1] * USV$u[, 1] %*% t(USV$v[, 1]) -
+       USV$d[2] * USV$u[, 2] %*% t(USV$v[, 2])
+```
+
+```{r}
+stopifnot(max(abs(
+Xtwo - USV$d[1] * USV$u[, 1] %*% t(USV$v[, 1]) -
+       USV$d[2] * USV$u[, 2] %*% t(USV$v[, 2]))) < 1e-12,
+max(abs(USV$d[3:4])) < 1e-13)
+```
+
+Compruebe la ortonormalidad calculando el producto cruz de la U y V matrices: 
+
+```{r}
+t(USV$u) %*% USV$u
+t(USV$v) %*% USV$v
+```
+
+Se usará la reescalada matriz turtles a una descomposición de valor singular. 
+
+```{r}
+turtles.svd = svd(scaledTurtles)
+turtles.svd$d
+turtles.svd$v
+dim(turtles.svd$u)
+```
+
+```{r}
+sum(turtles.svd$v[,1]^2)
+sum(turtles.svd$d^2) / 47
+```
+
+
+```{r}
+US = turtles.svd$u[,1, drop = FALSE] %*% turtles.svd$d[1]
+XV = scaledTurtles %*% turtles.svd$v[, 1, drop = FALSE]
+max(abs(US-XV))
+stopifnot(max(abs(US-XV)) < 1e-9)
+```
+
+```{r}
+svda$v[,1]
+```
+# 7.7 Trazado de las observaciones en el plano principal 
+
+¿Qué parte de la salida de las svd nos lleva a los primeros coeficientes de PC, también conocidos como cargas ? 
+
+```{r}
+ppdf = tibble(PC1n = -svda$u[, 1] * svda$d[1],
+              PC2n =  svda$u[, 2] * svda$d[2])
+gg = ggplot(ppdf, aes(x = PC1n, y = PC2n)) + 
+    geom_point() + 
+    geom_hline(yintercept = 0, color = "purple", lwd = 1.5, alpha = 0.5) +
+    xlab("PC1 ")+ ylab("PC2") + xlim(-3.5, 2.7) + ylim(-2, 2) + coord_fixed()
+gg + geom_point(aes(x = PC1n, y = 0), color = "red") +
+     geom_segment(aes(xend = PC1n, yend = 0), color = "red") 
+gg + geom_point(aes(x = 0, y = PC2n), color = "blue") +
+     geom_segment(aes(yend = PC2n, xend = 0), color = "blue") +
+     geom_vline(xintercept = 0, color = "skyblue", lwd = 1.5, alpha = 0.5) 
+```
+
+
+```{r}
+sum(ppdf$PC2n^2) 
+svda$d[2]^2
+```
+
+```{r}
+mean(ppdf$PC2n) 
+var(ppdf$PC2n) * (nrow(ppdf)-1)
+```
+
+```{r}
+var(ppdf$PC1n) 
+var(ppdf$PC2n) 
+```
+
+```{r}
+sd(ppdf$PC1n) / sd(ppdf$PC2n)
+svda$d[1] / svda$d[2]
+stopifnot(sd(ppdf$PC1n) / sd(ppdf$PC2n) - svda$d[1] / svda$d[2] < 1e-9)
+```
+## 7.7.1 PCA de los datos de las tortugas
+
+Ahora queremos hacer un análisis PCA completo de los datos de las tortugas. Recuerde, ya vimos las estadísticas de resumen para los datos de 1 y 2 dimensiones. Ahora vamos a responder a la pregunta sobre la dimensionalidad “verdadera” de estos datos reescalados. En el siguiente código, usamos la función princomp. Su valor de retorno es una lista de toda la información importante necesaria para trazar e interpretar un PCA. 
+
+```{r}
+cor(scaledTurtles)
+pcaturtles = princomp(scaledTurtles)
+pcaturtles
+library("factoextra")
+fviz_eig(pcaturtles, geom = "bar", bar_width = 0.4) + ggtitle("")
+```
+
+```{r}
+svd(scaledTurtles)$v[, 1]
+prcomp(turtles[, -1])$rotation[, 1]
+princomp(scaledTurtles)$loadings[, 1]
+dudi.pca(turtles[, -1], nf = 2, scannf = FALSE)$c1[, 1]
+```
+
+```{r}
+res = princomp(scaledTurtles)
+PC1 = scaledTurtles %*% res$loadings[,1]
+sd1 = sqrt(mean(res$scores[, 1]^2))
+```
+
+**Ahora vamos a combinar ambas puntuaciones de PC**
+
+```{r}
+fviz_pca_biplot(pcaturtles, label = "var", habillage = turtles[, 1]) +
+  ggtitle("")
+```
+
+```{r}
+pcadudit = dudi.pca(scaledTurtles, nf = 2, scannf = FALSE)
+apply(pcadudit$li, 2, function(x) sum(x^2)/48)
+pcadudit$eig
+```
+
+Ahora observamos las relaciones entre las variables, tanto las antiguas como las nuevas, dibujando lo que se conoce como el círculo de correlación. La relación de aspecto es 1 aquí y las variables están representadas por flechas como se muestra.
+
+```{r}
+fviz_pca_var(pcaturtles, col.circle = "black") + ggtitle("") +
+  xlim(c(-1.2, 1.2)) + ylim(c(-1.2, 1.2))
+```
+
+Explique las relaciones entre el número de filas de nuestra matriz de datos de tortugas y los siguientes números: 
+
+```{r}
+svd(scaledTurtles)$d/pcaturtles$sdev
+sqrt(47)
+```
+
+## 7.7.2 Un análisis completo: los atletas de decatlón
+
+```{r}
+cor(athletes) %>% round(1)
+```
+
+```{r}
+pca.ath = dudi.pca(athletes, scannf = FALSE)
+pca.ath$eig
+fviz_eig(pca.ath, geom = "bar", bar_width = 0.3) + ggtitle("")
+```
+
+```{r}
+fviz_pca_var(pca.ath, col.circle = "black") + ggtitle("")
+```
+
+```{r}
+athletes[, c(1, 5, 6, 10)] = -athletes[, c(1, 5, 6, 10)]
+cor(athletes) %>% round(1)
+pcan.ath = dudi.pca(athletes, nf = 2, scannf = FALSE)
+pcan.ath$eig
+```
+
+Círculo de correlación de las variables originales.
+
+```{r}
+fviz_pca_var(pcan.ath, col.circle="black") + ggtitle("")
+```
+
+```{r}
+fviz_pca_ind(pcan.ath) + ggtitle("") + ylim(c(-2.5,5.7))
+```
+
+Si observamos a los propios atletas tal como se muestran, notamos un ligero efecto de ordenación. ¿Ves una relación entre la calidad de los atletas y su número?
+
+```{r}
+data("olympic", package = "ade4")
+olympic$score
+```
+
+Ahora se hace el diagrama de dispersión comparando la puntuación del primer componente principal de los atletas con esta puntuación de los datos, se puede ver una fuerte correlación entre las dos variables. 
+
+```{r, warning=FALSE, message=FALSE}
+p = ggplot(tibble(pc1 = pcan.ath$li[, 1], score = olympic$score, id = rownames(athletes)),
+   aes(x = score, y = pc1, label = id)) + geom_text()
+p + stat_smooth(method = "lm", se = FALSE)
+```
+## 7.7.3 Cómo elegir k , el número de dimensiones ? 
+
+```{r}
+load("../data/screep7.RData")
+pcaS7 = dudi.pca(screep7, scannf = FALSE)
+fviz_eig(pcaS7,geom="bar",bar_width=0.5) + ggtitle("")
+fviz_eig(pcaS7,geom="bar",width=0.3)
+p7=prcomp(screep7,scale= TRUE)
+p7$sdev^2
+plot(p7)
+```
+# 7.8 PCA como herramienta exploratoria: uso de información adicional.
+
+```{r}
+pcaMsig3 = dudi.pca(Msig3transp, center = TRUE, scale = TRUE,
+                    scannf = FALSE, nf = 4)
+fviz_screeplot(pcaMsig3) + ggtitle("")
+```
+ A continuación, tenemos que enfrentar el último escenario, y usamos substrgimnasia para extraer los tipos de células y mostrar el screeplot.
+ 
+```{r}
+ids = rownames(Msig3transp)
+celltypes = factor(substr(ids, 7, 9))
+status = factor(substr(ids, 1, 3))
+table(celltypes)
+cbind(pcaMsig3$li, tibble(Cluster = celltypes, sample = ids)) %>%
+ggplot(aes(x = Axis1, y = Axis2)) +
+  geom_point(aes(color = Cluster), size = 5) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_vline(xintercept = 0, linetype = 2) +
+  scale_color_discrete(name = "Cluster") + coord_fixed()
+```
+
+PCA de la expresión génica para un subconjunto de 156 genes involucrados en las especificidades de cada uno de los tres tipos de células T independientes: efectoras, ingenuas y de memoria.
+
+```{r, warning=FALSE,message=FALSE}
+p_load("xcms", "faahKO")
+cdfpath = system.file("cdf", package = "faahKO")
+cdffiles = list.files(cdfpath, recursive = TRUE, full = TRUE)
+xset = xcmsSet(cdffiles)
+xset2 = group(xset)
+xset2 = retcor(xset2)
+xset2 = group(xset2, bw = 10)
+xset3 = fillPeaks(xset2)
+gt = groups(xset3)
+mat1 = groupval(xset3, value = "into")
+```
+
+## 7.8.1 Análisis de datos de espectroscopia de masas 
+
+```{r}
+load("../data/mat1xcms.RData")
+dim(mat1)
+pcamat1 = dudi.pca(t(mat1), scannf = FALSE, nf = 3)
+fviz_eig(pcamat1, geom = "bar", bar_width = 0.7) + ggtitle("")
+```
+
+```{r}
+dfmat1 = cbind(pcamat1$li, tibble(
+    label = rownames(pcamat1$li),
+    number = substr(label, 3, 4),
+    type = factor(substr(label, 1, 2))))
+pcsplot = ggplot(dfmat1,
+  aes(x=Axis1, y=Axis2, label=label, group=number, colour=type)) +
+ geom_text(size = 4, vjust = -0.5)+ geom_point(size = 3)+ylim(c(-18,19))
+pcsplot + geom_hline(yintercept = 0, linetype = 2) +
+  geom_vline(xintercept = 0, linetype = 2)
+```
+El primer plano principal para el mat1datos. Explica el 59% de la varianza. 
+```{r}
+pcsplot + geom_line(colour = "red")
+```
+
+## 7.8.2 Biplots y escalado
+
+```{r}
+p_load("pheatmap")
+load("../data/wine.RData")
+load("../data/wineClass.RData")
+wine[1:2, 1:7]
+pheatmap(1 - cor(wine), treeheight_row = 0.2)
+```
+
+```{r}
+winePCAd = dudi.pca(wine, scannf=FALSE)
+table(wine.class)
+fviz_pca_biplot(winePCAd, geom = "point", habillage = wine.class,
+   col.var = "violet", addEllipses = TRUE, ellipse.level = 0.69) +
+   ggtitle("") + coord_fixed()
+```
+Un biplot es una representación simultánea tanto del espacio de observaciones como del espacio de variables. 
+
+## 7.8.3 Un ejemplo de PCA ponderado  
+
+```{r}
+data("x", package = "Hiiragi2013")
+xwt = x[, x$genotype == "WT"]
+sel = order(rowVars(Biobase::exprs(xwt)), decreasing = TRUE)[1:100]
+xwt = xwt[sel, ]
+tab = table(xwt$sampleGroup)
+tab
+```
+
+Screeplot del PCA ponderado de los datos de Hiiragi. La caída después del segundo valor propio sugiere que un PCA bidimensional es apropiado. 
+
+```{r}
+xwt$weight = 1 / as.numeric(tab[xwt$sampleGroup])
+pcaMouse = dudi.pca(as.data.frame(t(Biobase::exprs(xwt))),
+  row.w = xwt$weight,
+  center = TRUE, scale = TRUE, nf = 2, scannf = FALSE)
+fviz_eig(pcaMouse) + ggtitle("")
+```
+
+Salida de PCA ponderada en los datos de Hiiragi. Las muestras están coloreadas según sus grupos. 
+
+```{r}
+fviz_pca_ind(pcaMouse, geom = "point", col.ind = xwt$sampleGroup) +
+  ggtitle("") + coord_fixed()
+```
+# 7.9 Resumen de este capítulo
+
+Matrices de preprocesamiento Los análisis de datos multivariados requieren un preprocesamiento "consciente". Después de consultar todas las medias, varianzas e histogramas unidimensionales, vimos cómo reescalar y volver a centrar los datos.
+
+Proyectar sobre nuevas variables Vimos cómo podemos hacer proyecciones en dimensiones más bajas (planos y 3D son las más utilizadas) de datos de dimensiones muy altas sin perder demasiada información. PCA busca nuevos more informativevariables que son combinaciones lineales de las originales (antiguas).
+
+Descomposición de matriz PCA se basa en encontrar descomposiciones de la matriz X 
+llamada SVD, esta descomposición proporciona una aproximación de rango inferior y es equivalente al análisis propio de X t X . Los cuadrados de los valores singulares son iguales a los valores propios ya las varianzas de las nuevas variables. Trazamos sistemáticamente estos valores antes de decidir cuántos ejes son necesarios para reproducir la señal en los datos. 
+
+Representaciones biplot El espacio de observaciones es naturalmente un espacio p-dimensional (las p variables originales proporcionan las coordenadas). El espacio de variables es n-dimensional. Ambas descomposiciones que hemos estudiado (valores singulares/valores propios y vectores singulares/vectores propios) proporcionan nuevas coordenadas para estos dos espacios, a veces llamamos a uno el dual del otro. Podemos trazar la proyección tanto de las observaciones como de las variables en los mismos vectores propios. Esto proporciona un biplot que puede ser útil para interpretar la salida de PCA.
+
+Proyección de otras variables de grupo La interpretación de PCA también puede verse facilitada por datos redundantes o contiguos sobre las observaciones. 
+
+# Ejercicios 
+
+Cree una primera matriz a de datos bivariados altamente correlacionados.
+
+```{r}
+mu1 = 1; mu2 = 2; s1=2.5; s2=0.8; rho=0.9;
+sigma = matrix(c(s1^2, s1*s2*rho, s1*s2*rho, s2^2),2)
+p_load("MASS")
+sim2d = data.frame(mvrnorm(50, mu = c(mu1,mu2), Sigma = sigma))
+svd(scale(sim2d))$d
+svd(scale(sim2d))$v[,1]
+```
+
+
+```{r}
+ggplot(data.frame(sim2d),aes(x=X1,y=X2)) +
+    geom_point()
+respc=princomp(sim2d)
+dfpc = data.frame(pc1=respc$scores[,1],
+pc2 = respc$scores[,2])
+ ggplot(dfpc,aes(x=pc1,y=pc2)) +
+   geom_point() + coord_fixed(2)
+```
+
+Los datos originales que se muestran en el diagrama de dispersión (A) y el gráfico obtenido usando la rotación de componentes principales (B).
