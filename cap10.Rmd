@@ -1,6 +1,6 @@
 ---
 title: "Cap10 Redes y árboles"
-date: '2022-06-22'
+date: '2022-06-19'
 output:
   rmdformats::downcute:
     lightbox: true
@@ -82,8 +82,10 @@ sg
 
 ```{r, warning=FALSE,message=FALSE}
 library(pacman)
-p_load("motmot","networksis","dynRB", network)
+#"networksis"
+p_load("dynRB", "network")
 data("finch")
+as.network(finch)
 plot(finch, vertex.col =
        ifelse(nchar(network.vertex.names(finch)) == 1,
          "forestgreen", "gold3"),

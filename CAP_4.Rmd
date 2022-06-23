@@ -1,6 +1,6 @@
 ---
 title: "CAP4  Modelos de mezcla "
-date: '2022-06-14'
+date: '2022-06-10'
 output:
   rmdformats::downcute:
     lightbox: true

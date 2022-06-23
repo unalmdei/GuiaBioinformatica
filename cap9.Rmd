@@ -1,6 +1,6 @@
 ---
 title: "Cap9 Métodos multivariados para datos heterogéneos"
-date: '2022-06-21'
+date: '2022-06-18'
 output:
   rmdformats::downcute:
     lightbox: true
@@ -115,7 +115,7 @@ ggplot(dfekm, aes(x = MDS1, y = MDS2)) +
   geom_text_repel(aes(label = name)) + coord_fixed()
 ```
 
-```{r}
+```{r, eval=FALSE}
 p_load("vegan")
 nmds.stress = function(x, sim = 100, kmax = 4) {
   sapply(seq_len(kmax), function(k)
@@ -276,11 +276,10 @@ names(col_clus) = sort(unique(publishedClusters))
 ```
 
 ```{r}
-p_load("rgl")
-batch = colData(corese)$Batch
-plot3d(PCS,aspect=sqrt(c(84,24,20)),col=col_clus[batch])
-plot3d(PCS,aspect=sqrt(c(84,24,20)),
-col = col_clus[as.character(publishedClusters)])
+#p_load("rgl")
+#batch = colData(corese)$Batch
+#plot3d(PCS,aspect=sqrt(c(84,24,20)),col=col_clus[batch])
+#plot3d(PCS,aspect=sqrt(c(84,24,20)),col = col_clus[as.character(publishedClusters)])
 ```
 
 
@@ -312,9 +311,9 @@ fviz_eig(HIVca,geom="bar",bar_width=0.6)+ggtitle("")
 ```
 
 ```{r}
-p_load("rgl")
-CA1=HIVca$li[,1];CA2=HIVca$li[,2];CA3=HIVca$li[,3]
-plot3d(CA1,CA2,CA3,aspect=FALSE,col="purple")
+#p_load("rgl")
+#CA1=HIVca$li[,1];CA2=HIVca$li[,2];CA3=HIVca$li[,3]
+#plot3d(CA1,CA2,CA3,aspect=FALSE,col="purple")
 ```
 
 ```{r}
@@ -733,7 +732,7 @@ cellsn.kcmds=cmdscale(dist1kn,k=20,eig=TRUE)
 cellsn2.kcmds=cmdscale(dist2kn,k=20,eig=TRUE)
 ```
 
-```{r}
+```{r,eval=FALSE}
 colc = rowData(Moignard)$cellcol
 p_load("scatterplot3d")
 scatterplot3d(cellsn2.kcmds$points[, 1:3], color=colc, pch = 20,
@@ -742,7 +741,7 @@ scatterplot3d(cellsn2.kcmds$points[, 1:3], color=colc, pch = 20,
    xlab = "Axis k1", ylab = "Axis k2", zlab = "Axis k3", angle = -70)
 ```
 
-```{r}
+```{r, eval=FALSE}
 p_load("rgl")
 plot3d(cellsn2.kcmds$points[, 1:3], col = colc, size = 3,
        xlab = "Axis1", ylab = "Axis2", zlab = "Axis3")
@@ -763,7 +762,7 @@ combs = combn(4, 3)
 lpcplots = apply(combs, 2, function(j) lpc(dmap1$X[, j], scale = FALSE))
 ```
 
-```{r}
+```{r, eval=FALSE}
 p_load("rgl")
 for (i in seq_along(lpcplots))
   plot(lpcplots[[i]], type = "l", lwd = 3,
@@ -807,7 +806,7 @@ scp3d(anglea=210)
 scp3d(anglea=150)
 ```
 
-```{r}
+```{r, eval=FALSE}
 # interactive plot
 p_load("rgl")
 plot3d(dmap1$X[,1:3], col=colc, size=3)

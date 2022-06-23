@@ -1,0 +1,426 @@
+---
+title: "CAP 11"
+date: '2022-06-21'
+output:
+  rmdformats::downcute:
+    lightbox: true
+    gallery: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(pacman)
+p_load("EBImage")
+imagefile = system.file("images", "mosquito.png",
+                        package = "MSMB")
+mosq = readImage(imagefile)
+```
+```{r}
+## display(mosq)
+```
+```{r}
+display(mosq, method = "raster")
+text(x = 85, y = 800, label = "A mosquito",
+     adj = 0, col = "orange", cex = 1.5)
+```
+```{r}
+## imagefile = system.file("images", "hiv.png",
+##                         package = "MSMB")
+## hivc = readImage(imagefile)
+## display(hivc)
+```
+```{r}
+imagefile = system.file("images", "hiv.png",
+                        package = "MSMB")
+hivc = readImage(imagefile)
+```
+```{r}
+```
+```{r}
+nuc = readImage(system.file("images", "nuclei.tif",
+                            package = "EBImage"))
+display(1 - nuc, method = "raster", all = TRUE)
+```
+```{r}
+display(1 - nuc, method = "raster", frame = 2)
+```
+```{r}
+class(mosq)
+```
+```{r}
+## showClass("Image")
+```
+```{r}
+dim(mosq)
+```
+```{r}
+hist(mosq)
+```
+```{r}
+stopifnot(all(mosq>=0 & mosq<=1), isTRUE(all.equal(max(mosq), 1)), isTRUE(all.equal(min(mosq), 0)))
+```
+```{r}
+imageData(mosq)[1:3, 1:6]
+```
+```{r}
+mosq
+```
+```{r}
+hivc
+```
+```{r}
+stopifnot(colorMode(mosq)==Grayscale, colorMode(hivc)==Color, dim(nuc)[3]==4)
+```
+```{r}
+nuc
+dim(imageData(nuc))
+```
+```{r}
+stopifnot(all(c("  frames.total : 4 ", "  frames.render: 4 ") %in%
+              capture.output(EBImage:::showImage(nuc))))
+```
+```{r}
+writeImage(hivc, "hivc.jpeg", quality = 85)
+```
+```{r}
+object.size(hivc) |> format(units = "Mb")
+(object.size(hivc) / prod(dim(hivc))) |> format() |> paste("per pixel")
+file.info("hivc.jpeg")$size
+16 * 3 * 8
+```
+```{r}
+```
+```{r}
+```
+```{r}
+mosqinv = normalize(-mosq)
+```
+```{r}
+mosqcont = mosq * 3
+mosqexp = mosq ^ (1/3)
+```
+```{r}
+```
+```{r}
+mosqcrop   = mosq[100:438, 112:550]
+mosqthresh = mosq > 0.5
+mosqtransp = transpose(mosq)
+```
+```{r}
+```
+```{r}
+stopifnot(identical(t(mosq), transpose(mosq)))
+```
+```{r}
+```
+```{r}
+mosqrot   = EBImage::rotate(mosq, angle = 30)
+mosqshift = translate(mosq, v = c(40, 70))
+mosqflip  = flip(mosq)
+mosqflop  = flop(mosq)
+```
+```{r}
+imagefiles = system.file("images", c("image-DAPI.tif",
+  "image-FITC.tif", "image-Cy3.tif"), package="MSMB")
+cells = readImage(imagefiles)
+```
+```{r}
+stopifnot(dim(cells)[3]==3)
+```
+```{r}
+```
+```{r}
+apply(cells, 3, range)
+```
+```{r}
+cells[,,1]   = 32 * cells[,,1]
+cells[,,2:3] = 16 * cells[,,2:3]
+apply(cells, 3, range)
+```
+```{r}
+# combined is also defined in dplyr, tile seems also popular....
+writeImage(EBImage::tile(EBImage::combine(
+  toRGB(getFrame(cells, 1)),
+  toRGB(getFrame(cells, 2)),
+  toRGB(getFrame(cells, 3)),
+  rgbImage(red   = getFrame(cells, 3),
+           green = getFrame(cells, 2),
+           blue  = getFrame(cells, 1))), nx = 4, lwd = 5, fg.col = "white"),
+  files = paste0(knitr::opts_chunk$get("fig.path"), "LauferCells.png")) #$
+```
+```{r}
+w = makeBrush(size = 51, shape = "gaussian", sigma = 7)
+nucSmooth = filter2(getFrame(cells, 1), w)
+```
+```{r}
+p_load("tibble")
+p_load("ggplot2")
+tibble(w = w[(nrow(w)+1)/2, ]) |>
+  ggplot(aes(y = w, x = seq(along = w))) + geom_point()
+```
+```{r}
+```
+```{r}
+cellsSmooth = Image(dim = dim(cells))
+sigma = c(1, 3, 3)
+for(i in seq_along(sigma))
+  cellsSmooth[,,i] = filter2( cells[,,i],
+         filter = makeBrush(size = 51, shape = "gaussian",
+                            sigma = sigma[i]) )
+```
+```{r}
+py = seq(-1, +1, length.out = dim(cellsSmooth)[1])
+px = seq(-1, +1, length.out = dim(cellsSmooth)[2])
+illuminationGradient = Image(
+     outer(py, px, function(x, y) exp(-(x^2+y^2))))
+nucBadlyIlluminated = cellsSmooth[,,1] * illuminationGradient
+```
+```{r}
+disc = makeBrush(21, "disc")
+disc = disc / sum(disc)
+localBackground = filter2(nucBadlyIlluminated, disc)
+offset = 0.02
+nucBadThresh = (nucBadlyIlluminated - localBackground > offset)
+```
+```{r}
+```
+```{r}
+nucThresh =
+  (cellsSmooth[,,1] - filter2(cellsSmooth[,,1], disc) > offset)
+```
+```{r}
+nucOpened = EBImage::opening(nucThresh,
+                  kern = makeBrush(5, shape = "disc"))
+```
+```{r}
+```
+```{r}
+nucSeed = bwlabel(nucOpened)
+table(nucSeed)
+```
+```{r}
+## display(colorLabels(nucSeed))
+```
+```{r}
+nucMask = cellsSmooth[,,1] - filter2(cellsSmooth[,,1], disc) > 0
+```
+```{r}
+nucMask = fillHull(nucMask)
+```
+```{r}
+nuclei = propagate(cellsSmooth[,,1], nucSeed, mask = nucMask)
+```
+```{r}
+```
+```{r}
+zeros        = Image(dim = dim(nuclei))
+voronoiExamp = propagate(seeds = nuclei, x = zeros, lambda = 100)
+voronoiPaint = paintObjects(voronoiExamp, 1 - nucOpened)
+```
+```{r}
+head(table(voronoiExamp))
+ind = which(voronoiExamp == 13, arr.ind = TRUE)
+head(ind, 3)
+```
+```{r}
+hist(log(cellsSmooth[,,3]) )
+```
+```{r}
+hist(log(cellsSmooth[,,3]), xlim = -c(3.6, 3.1), breaks = 300)
+```
+```{r}
+## hist(log(cellsSmooth[,,3]) )
+## hist(log(cellsSmooth[,,3]), xlim = -c(3.6, 3.1), breaks = 300)
+```
+```{r}
+stopifnot(mean(cellsSmooth[,,3]>=exp(-3.6) & cellsSmooth[,,3]<=exp(-3.1)) > 0.68)
+```
+```{r}
+p_load("genefilter")
+bgPars = function(x) {
+  x    = log(x)
+  loc  = half.range.mode( x )
+  left = (x - loc)[ x < loc ]
+  wid  = sqrt( mean(left^2) )
+  c(loc = loc, wid = wid, thr = loc + 6*wid)
+}
+cellBg = apply(cellsSmooth, MARGIN = 3, FUN = bgPars)
+cellBg
+```
+```{r}
+hist(log(cellsSmooth[,,3]), xlim = -c(3.6, 3.1), breaks = 300)
+abline(v = cellBg[c("loc", "thr"), 3], col = c("brown", "red"))
+```
+```{r}
+cytoplasmMask = (cellsSmooth[,,2] > exp(cellBg["thr", 2])) |
+       nuclei | (cellsSmooth[,,3] > exp(cellBg["thr", 3]))
+```
+```{r}
+cellbodies = propagate(x = cellsSmooth[,,3], seeds = nuclei,
+                       lambda = 1.0e-2, mask = cytoplasmMask)
+```
+```{r}
+```
+```{r}
+cellsColor = rgbImage(red   = cells[,,3],
+                      green = cells[,,2],
+                      blue  = cells[,,1])
+nucSegOnNuc  = paintObjects(nuclei, tgt = toRGB(cells[,,1]),
+                            col = "#ffff00")
+nucSegOnAll  = paintObjects(nuclei, tgt = cellsColor,
+                            col = "#ffff00")
+cellSegOnAll = paintObjects(cellbodies, tgt = nucSegOnAll,
+                            col = "#ff0080")
+```
+```{r}
+for(v in c("illuminationGradient", "nucBadlyIlluminated", "localBackground", "nucBadThresh",
+           "nucThresh", "nucOpened", "colorLabels(nucSeed)", "nucMask", "colorLabels(nuclei)",
+           "cytoplasmMask", "colorLabels(cellbodies)", "nucSegOnNuc", "nucSegOnAll", "nucSmooth", "cellSegOnAll",
+           "voronoiPaint", "mosq", "mosqinv", "mosqcont", "mosqexp", "mosqcrop", "mosqthresh", "mosqtransp",
+           "mosqrot", "mosqshift", "mosqflip", "mosqflop", "hivc"))
+  writeImage(eval(parse(text = v)), files =
+    paste0(knitr::opts_chunk$get("fig.path"), gsub("[[:punct:]]", "", v), ".png")) #$
+  ## 'eval(parse())' since we also want to evaluate expressions "colorLabels(nucSeed)" etc.
+```
+```{r}
+meanNucInt       = tapply(cells[,,1], nuclei, mean)
+meanActIntInNuc  = tapply(cells[,,3], nuclei, mean)
+meanActIntInCell = tapply(cells[,,3], cellbodies, mean)
+```
+```{r}
+p_load("GGally")
+ggpairs(tibble(meanNucInt, meanActIntInNuc, meanActIntInCell))
+```
+```{r}
+F1 = computeFeatures(nuclei,     cells[,,1], xname = "nuc",
+                                             refnames = "nuc")
+F2 = computeFeatures(cellbodies, cells[,,2], xname = "cell",
+                                             refnames = "tub")
+F3 = computeFeatures(cellbodies, cells[,,3], xname = "cell",
+                                             refnames = "act")
+dim(F1)
+```
+```{r}
+ F1[1:3, 1:5]
+```
+```{r}
+```
+```{r}
+```
+```{r}
+p_load("readr")
+p_load("dplyr")
+cellclasses = c("T_cells", "Tumor", "DCs", "other_cells")
+brcalymphnode = lapply(cellclasses, function(k) {
+    read_csv(file.path("..", "data",
+             sprintf("99_4525D-%s.txt", k))) |>
+    transmute(x = globalX,
+              y = globalY,
+              class = k)
+}) |> bind_rows() |> mutate(class = factor(class))
+brcalymphnode
+table(brcalymphnode$class)
+```
+```{r}
+tabtab = table(brcalymphnode$class)
+within = function(x, a, b) (x>a & x<b)
+stopifnot(all(within(tabtab[c("T_cells", "Tumor", "DCs")], c(100000, 27000, 800), c(110000, 28000, 1000))))
+```
+```{r}
+ggplot(filter(brcalymphnode, class %in% c("T_cells", "Tumor")),
+   aes(x = x, y = y, col = class)) + geom_point(shape = ".") +
+   facet_grid( . ~ class) + guides(col = "none")
+```
+```{r}
+p_load("spatstat")
+```
+```{r}
+ln = with(brcalymphnode,
+  ppp(x = x, y = y, marks = class, xrange = range(x), yrange = range(y)))
+ln
+```
+```{r}
+stopifnot(identical(class(ln), "ppp"))
+```
+```{r}
+p_load("geometry")
+coords = cbind(ln$x, ln$y)
+chull = convhulln( coords )
+```
+```{r}
+pidx = integer(nrow(chull) + 1)
+pidx[1:2] = chull[1, ]
+  wh = which(chull == pidx[j-1], arr.ind = TRUE)
+  stopifnot(nrow(wh )== 1)
+  wh[, "col"] = 3 - wh[, "col"] ## 2->1, 1->2
+  pidx[j] = chull[wh]
+pidx = rev(pidx)
+```
+```{r}
+ggplot(tibble(x = ln$x, y = ln$y)[pidx, ], aes(x = x, y = y)) +
+  geom_point() + geom_path() + coord_fixed()
+```
+```{r}
+ln = with(brcalymphnode,
+   ppp(x = x, y = y, marks = class, poly = coords[ pidx, ],
+       check = FALSE))
+ln
+```
+```{r}
+```
+```{r}
+d = density(subset(ln, marks == "Tumor"), edge=TRUE, diggle=TRUE)
+plot(d)
+```
+```{r}
+par(mai = c(0, 0, 0.2, 0.7))
+plot(d)
+```
+```{r}
+d0 = density(subset(ln, marks == "Tumor"), edge = FALSE)
+plot(d0)
+```
+```{r}
+par(mai = c(0, 0, 0.2, 0.7))
+plot(d0)
+```
+```{r}
+rr = relrisk(ln, sigma = 250)
+```
+```{r}
+plot(rr)
+```
+```{r}
+m = rr[[1]]$v
+for(i in 2:length(rr)) m = m + rr[[i]]$v
+stopifnot(all(is.na(m) | abs(m-1)<1e-6))
+```
+```{r}
+gln = Gest(ln)
+gln
+```
+```{r}
+p_load("RColorBrewer")
+plot(gln, xlim = c(0, 10), lty = 1, col = brewer.pal(4, "Set1"))
+```
+```{r}
+Lln = Linhom(subset(ln, marks == "T_cells"))
+Lln
+```
+```{r}
+plot(Lln, lty = 1, col = brewer.pal(3, "Set1"))
+```
+```{r}
+pcfln = pcf(Kinhom(subset(ln, marks == "T_cells")))
+```
+```{r}
+plot(pcfln, lty = 1)
+plot(pcfln, lty = 1, xlim = c(0, 10))
+```
+```{r}
+pcfln2 = pcf(Kinhom(subset(ln, marks == "T_cells"), r = seq(0, 10, by = 0.2)))
+plot(pcfln2, lty = 1)
+```

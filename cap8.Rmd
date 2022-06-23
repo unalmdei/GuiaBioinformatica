@@ -1,6 +1,6 @@
 ---
 title: "Cap8 Datos de conteo de alto rendimiento"
-date: '2022-06-20'
+date: '2022-06-16'
 output:
   rmdformats::downcute:
     lightbox: true

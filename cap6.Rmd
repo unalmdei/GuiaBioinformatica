@@ -1,6 +1,6 @@
 ---
 title: "cap6 Testeo - Pruebas"
-date: '2022-06-17'
+date: '2022-06-12'
 output:
   rmdformats::downcute:
     lightbox: true

@@ -1,6 +1,6 @@
 ---
 title: "cap3 Gráficos de alta calidad en R"
-date: '2022-06-10'
+date: '2022-06-08'
 output:
   rmdformats::downcute:
     lightbox: true

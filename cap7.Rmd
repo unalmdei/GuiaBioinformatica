@@ -1,6 +1,6 @@
 ---
 title: "Cap7 Análisis multivariado "
-date: '2022-06-18'
+date: '2022-06-16'
 output:
   rmdformats::downcute:
     lightbox: true
